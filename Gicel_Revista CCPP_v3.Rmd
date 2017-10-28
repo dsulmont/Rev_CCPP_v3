@@ -1,0 +1,362 @@
+---
+title: "GICEL: Revista Ciencias Política version 3"
+author: "David Sulmont"
+output: html_document
+---
+
+# CARGA DE DATOS
+
+```{r, warning=FALSE, results='hide', message=FALSE}
+library(haven)
+library(plyr)
+library(car)
+library(ggplot2)
+library(Rmisc)
+library(Hmisc)
+library(psych)
+library(fmsb)
+
+gicel1 <- read_sav("GICEL_PANEL.sav")
+
+gicel1$sex <- factor(gicel1$SEXO, labels = c("Masc", "Fem"))
+gicel1$region <- factor(gicel1$DOMINIO, 
+                        labels = c("Lima-Callao", "Norte", "Centro", "Sur", "Oriente")) 
+
+```
+
+# ESCALA ESTATISMO
+
+```{r}
+
+estat <-gicel1[, 103:110]
+
+cols <- names(estat)
+
+estat[cols] <- lapply(estat[cols], function (x) {x <- ((x-5)*(-1))})
+
+estat$ind.est <- rowSums(estat)
+
+estat$ind.est <- (estat$ind.est/32)*100
+summary(estat$ind.est)
+hist(estat$ind.est)
+
+estat2 <- estat[, 1:8]
+
+
+fit <- principal(na.omit(estat2), nfactors=1)
+fit
+alpha(estat2)
+```
+
+# ESCALA ILIBERALISMO
+
+```{r}
+ilib <-gicel1[, 111:118]
+
+names(ilib)
+
+cols <- names(ilib)
+
+ilib[cols] <- lapply(ilib[cols], function (x) {x <- ((x-5)*(-1))})
+
+ilib$ind.ilib <- rowSums(ilib)
+
+ilib$ind.ilib <- (ilib$ind.ilib/32)*100
+summary(ilib$ind.ilib)
+hist(ilib$ind.ilib)
+
+
+ilib2 <- ilib[, 1:8]
+
+
+fit <- principal(na.omit(ilib2), nfactors=1)
+fit
+alpha(ilib2)
+```
+
+
+# SE AÑADE LOS ÍNDICES A LA BD
+
+```{r}
+gicel1$ind.est <- estat$ind.est
+gicel1$ind.ilib <- ilib$ind.ilib
+
+table(gicel1$P20)
+
+gicel1$izde.e <- recode(gicel1$P20, "88:99=NA")
+gicel1$izde.e <- gicel1$izde.e*10
+
+misvar <- c("ind.ilib", "ind.est", "izde.e")
+data1 <- gicel1[misvar]
+
+
+rcorr(as.matrix(data1))
+```
+
+
+# VOTO 
+```{r}
+voto1v <- gicel1$P6
+
+voto1v <- recode(voto1v, "7:10 = 7; 20:21 = 8")
+voto1v <- factor(voto1v)
+levels(voto1v) <- c("Fujimori", "PPK", "Mendoza","Barnechea", "García", "Santos", "Otros", "B/V" )
+table(voto1v)
+
+
+voto2v <- gicel1$P10
+voto2v <- recode(voto2v, "20:21=3; 88=4; 99=NA")
+voto2v <- factor(voto2v)
+levels(voto2v) <- c("Fujimori", "PPK", "B/V", "NS")
+table(voto2v)
+
+
+gicel1$voto1v <- voto1v
+gicel1$voto2v <- voto2v
+
+```
+
+# Recodificación variables de preferencia por candidatos
+
+```{r}
+
+gicel1$gusta.kf <- gicel1$P18A
+gicel1$gusta.kf[gicel1$gusta.kf > 10] <- NA
+
+gicel1$gusta.ppk <- gicel1$P18B
+gicel1$gusta.ppk[gicel1$gusta.ppk > 10] <- NA
+
+gicel1$gusta.vm <- gicel1$P18C
+gicel1$gusta.vm[gicel1$gusta.vm > 10] <- NA
+
+gicel1$gusta.kf <- gicel1$gusta.kf*10
+gicel1$gusta.ppk <- gicel1$gusta.ppk*10
+gicel1$gusta.vm <- gicel1$gusta.vm*10
+
+
+```
+
+
+#POSICIONAMIENTO DE LOS CANDIDATOS
+
+```{r}
+
+# Izquierda - derecha 2016
+
+gicel1$izde.kf <- gicel1$P19A
+gicel1$izde.ppk <- gicel1$P19B
+gicel1$izde.vm <- gicel1$P19C
+
+gicel1$izde.kf[gicel1$izde.kf > 10] <- NA
+gicel1$izde.ppk[gicel1$izde.ppk > 10] <- NA
+gicel1$izde.vm[gicel1$izde.vm > 10] <- NA
+
+gicel1$izde.kf <- gicel1$izde.kf*10
+gicel1$izde.ppk <- gicel1$izde.ppk*10
+gicel1$izde.vm <- gicel1$izde.vm*10
+
+
+# Estatismo - mercado 
+
+table(gicel1$P37A)
+
+table(gicel1$P37A, exclude = NULL)
+
+gicel1$mdo.kf <- gicel1$P37A*10
+gicel1$mdo.ppk <- gicel1$P37B*10
+gicel1$mdo.vm <- gicel1$P37C*10
+
+gicel1$mdo.kf[gicel1$mdo.kf > 100] <- NA
+gicel1$mdo.ppk[gicel1$mdo.ppk > 100] <- NA
+gicel1$mdo.vm[gicel1$mdo.vm > 100] <- NA
+
+gicel1$mdo.kf <- (gicel1$mdo.kf-100)*-1
+gicel1$mdo.ppk <- (gicel1$mdo.ppk-100)*-1
+gicel1$mdo.vm <- (gicel1$mdo.vm-100)*-1
+
+# Respeto constitución
+
+gicel1$const.kf <- gicel1$P38A*10
+gicel1$const.ppk <- gicel1$P38B*10
+gicel1$const.vm <- gicel1$P38C*10
+
+gicel1$const.kf[gicel1$const.kf > 100] <- NA
+gicel1$const.ppk[gicel1$const.ppk > 100] <- NA
+gicel1$const.vm[gicel1$const.vm > 100] <- NA
+
+gicel1$const.kf <- (gicel1$const.kf-100)*-1
+gicel1$const.ppk <- (gicel1$const.ppk-100)*-1
+gicel1$const.vm <- (gicel1$const.vm-100)*-1
+
+
+```
+
+# CORRELACIONES ENTRE POSICIONES DE LOS CANDIDATOS
+
+```{r}
+misvar <- c("izde.kf", "izde.ppk", "izde.vm", "mdo.kf", "mdo.ppk", "mdo.vm", 
+            "const.kf", "const.ppk", "const.vm")
+data <- gicel1[misvar]
+
+rcorr(as.matrix(data))
+```
+
+#LIDERAZGO DE LOS CANDIDATOS
+
+```{r}
+gicel1$lider.kf <- gicel1$P16A
+gicel1$lider.kf[gicel1$lider.kf > 4] <- NA
+gicel1$lider.kf <- (gicel1$lider.kf-4)*-1
+
+
+gicel1$lider.ppk <- gicel1$P16B
+gicel1$lider.ppk[gicel1$lider.ppk > 4] <- NA
+gicel1$lider.ppk <- (gicel1$lider.ppk-4)*-1
+
+gicel1$lider.vm <- gicel1$P16C
+gicel1$lider.vm[gicel1$lider.vm > 4] <- NA
+gicel1$lider.vm <- (gicel1$lider.vm-4)*-1
+
+```
+
+
+# MODELOS DE REGRESIÓN GUSTO POR EL CANDIDATO
+
+```{r}
+
+# FUJIMORI
+
+summary(lm(gusta.kf~sex + EDAD + P54 + region +
+             const.kf + mdo.kf + ind.ilib + ind.est + izde.e, data = gicel1))
+
+summary(lm(gusta.kf~sex + EDAD + P54 + region +
+             const.kf + mdo.kf + ind.ilib + ind.est + izde.e + lider.kf, data = gicel1))
+
+
+# PPK 
+
+summary(lm(gusta.ppk~sex + EDAD + P54 + region +
+             const.ppk + mdo.ppk + ind.ilib + ind.est + izde.e, data = gicel1))
+
+summary(lm(gusta.ppk~sex + EDAD + P54 + region +
+             const.ppk + mdo.ppk + ind.ilib + ind.est + izde.e + lider.ppk, data = gicel1))
+
+
+# Mendoza
+
+summary(lm(gusta.vm~sex + EDAD + P54 + region +
+             const.vm + mdo.vm + ind.ilib + ind.est + izde.e, data = gicel1))
+
+summary(lm(gusta.vm~sex + EDAD + P54 + region +
+             const.vm + mdo.vm + ind.ilib + ind.est + izde.e + lider.vm, data = gicel1))
+
+
+```
+
+#MODELOS DE REGRESION VOTO 1RA VUELTA
+
+```{r}
+
+# Dicotómicas por candidato
+
+table(gicel1$voto1v)
+
+gicel1$voto1.fuji <- recode(as.numeric(gicel1$voto1v), "1=1; NA = NA; else=0")
+gicel1$voto1.ppk <- recode(as.numeric(gicel1$voto1v), "2=1; NA = NA; else=0")
+gicel1$voto1.vm <- recode(as.numeric(gicel1$voto1v), "3=1; NA = NA; else=0")
+
+
+# VOTO POR FUJIMORI
+
+v1.fuji1 <- glm(voto1.fuji~const.kf + mdo.kf + ind.ilib + ind.est + izde.e, 
+          data = gicel1, family = "binomial") 
+summary(v1.fuji1)
+
+NagelkerkeR2(v1.fuji1)
+
+v1.fuji2 <- glm(voto1.fuji~const.kf + mdo.kf + ind.ilib + ind.est + izde.e + lider.kf, 
+          data = gicel1, family = "binomial")
+summary(v1.fuji2)
+
+NagelkerkeR2(v1.fuji2)
+
+#VOTO POR PPK
+
+v1.ppk1 <- glm(voto1.ppk~const.ppk + mdo.ppk + ind.ilib + ind.est + izde.e, 
+          data = gicel1, family = "binomial")
+summary(v1.ppk1)
+
+NagelkerkeR2(v1.ppk1)
+
+
+v1.ppk2 <- glm(voto1.ppk~const.ppk + mdo.ppk + ind.ilib + ind.est + izde.e + lider.ppk, 
+          data = gicel1, family = "binomial")
+summary(v1.ppk2)
+
+NagelkerkeR2(v1.ppk2)
+
+#VOTO POR MENDOZA
+
+v1.vm1 <- glm(voto1.vm~const.vm + mdo.vm + ind.ilib + ind.est + izde.e, 
+          data = gicel1, family = "binomial")
+summary(v1.vm1)
+
+NagelkerkeR2(v1.vm1)
+
+v1.vm2 <- glm(voto1.vm~const.vm + mdo.vm + ind.ilib + ind.est + izde.e + lider.vm, 
+          data = gicel1, family = "binomial")
+summary(v1.vm2)
+
+NagelkerkeR2(v1.vm2)
+
+```
+
+
+# VOTO 2DA VUELTA
+
+```{r}
+#ANTIFUJIMORISMO
+
+gicel1$antifuji <- recode(gicel1$gusta.kf, "0:3=1; 4:hi=0")
+table(gicel1$gusta.kf, exclude = NULL)
+table(gicel1$antifuji, exclude = NULL)
+
+m0 <- glm(antifuji~const.kf + mdo.kf + ind.ilib + ind.est + izde.e + P54, 
+          data = gicel1, family = "binomial")
+summary(m0)
+NagelkerkeR2(m0)
+
+
+#VOTO PPK vs FUJI
+
+gicel1$voto2v2 <- recode(gicel1$voto2v, "'B/V'=NA; 'NS'=NA")
+table(gicel1$voto2v2)
+
+gicel1$voto.fuji2 <- gicel1$voto2v2 == "Fujimori"
+table(gicel1$voto.fuji2)
+
+
+m2.1 <- glm(voto.fuji2~const.kf + mdo.kf + const.ppk + 
+              mdo.ppk + ind.ilib + ind.est + izde.e + lider.kf + lider.ppk, 
+          data = gicel1, family = "binomial")
+summary(m2.1)
+
+NagelkerkeR2(m2.1)
+
+
+m2.2 <- glm(voto.fuji2~const.kf + mdo.kf + const.ppk + 
+              mdo.ppk + ind.ilib + ind.est + izde.e + lider.kf + lider.ppk +antifuji,
+          data = gicel1, family = "binomial")
+summary(m2.2)
+
+NagelkerkeR2(m2.2)
+
+
+```
+
+
+Grabar la BD
+
+```{r}
+save(gicel1, file = "gicel1.Rdata")
+```
